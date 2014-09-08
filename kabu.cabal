@@ -5,7 +5,8 @@ name:                kabu
 version:             0.1.0.0
 -- synopsis:            
 -- description:         
--- license:             
+homepage:            https://github.com/cutsea110/kabu
+license:             BSD3
 license-file:        LICENSE
 author:              cutsea110
 maintainer:          cutsea110@gmail.com
@@ -19,6 +20,6 @@ executable kabu
   main-is:             Main.hs
   -- other-modules:       
   other-extensions:    OverloadedStrings
-  build-depends:       base >=4.6 && <4.7, attoparsec >=0.10 && <0.11, bytestring >=0.10 && <0.11, text >=0.11 && <0.12, time >=1.4 && <1.5, iconv >=0.4 && <0.5, utf8-string >=0.3 && <0.4, HTTP >=4000.2 && <4000.3, postgresql-simple >=0.4 && <0.5, process >=1.1 && <1.2
+  build-depends:       base >=4.7 && <4.8, attoparsec >=0.10 && <0.11, bytestring >=0.10 && <0.11, text >=1.1 && <1.2, time >=1.4 && <1.5, HTTP >=4000.2 && <4000.3, process >=1.2 && <1.3, iconv >=0.4 && <0.5, utf8-string >=0.3 && <0.4, postgresql-simple >=0.4 && <0.5
   -- hs-source-dirs:      
   default-language:    Haskell2010
