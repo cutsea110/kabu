@@ -2,6 +2,7 @@
 module Main where
 
 import Data.Foldable (find)
+import Data.List (unfoldr)
 import Control.Applicative ((<$>), (<*>), (<*), (*>), (<|>), many)
 import Data.Attoparsec.Text (parseOnly, many', string, try, (<?>), decimal, char, Parser, notChar, double)
 import qualified Data.ByteString.Lazy.Char8 as BL
@@ -147,7 +148,7 @@ mkCon = connect defaultConnectInfo { connectUser = "cutsea110", connectPassword 
 insert :: ToRow a => a -> IO Int64
 insert x = do
   con <- mkCon
-  execute con "insert into stocks (day,code,name,market,category,openingprice,highprice,lowprice,closingprice,volumeoftrading,tradingvalue) values (?,?,?,?,?,?,?,?,?,?,?)" x
+  execute con "insert into stock (day,code,name,market,category,openingprice,highprice,lowprice,closingprice,volumeoftrading,tradingvalue) values (?,?,?,?,?,?,?,?,?,?,?)" x
 
 type Code = Text
 type Name = Text
@@ -155,15 +156,22 @@ type Name = Text
 collect :: Either Code Name -> IO [Stock]
 collect (Left cd) = do
   con <- mkCon
-  query con "select * from stocks where code = ?" (Only cd)
+  query con "select * from stock where code = ?" (Only cd)
 collect (Right nm) = do
   con <- mkCon
-  query con "select * from stocks where name = ?" (Only nm)
+  query con "select * from stock where name = ?" (Only nm)
 
 get :: Either Code Name -> IO (Maybe Stock)
 get (Left cd) = do
   con <- mkCon
-  fmap (find (const True)) $ query con "select * from stocks where code = ? limit 1" (Only cd)
+  fmap (find (const True)) $ query con "select * from stock where code = ? limit 1" (Only cd)
 get (Right nm) = do
   con <- mkCon
-  fmap (find (const True)) $ query con "select * from stocks where name = ? limit 1" (Only nm)
+  fmap (find (const True)) $ query con "select * from stock where name = ? limit 1" (Only nm)
+
+
+ma :: Int -> [Int] -> [Int]
+ma n = map (\xs -> sum xs `div` n) . filter (\xs -> length xs == n) . mset n
+
+mset :: Int -> [a] -> [[a]]
+mset n = unfoldr (\xs -> if null xs then Nothing else Just (take n xs, drop 1 xs))
