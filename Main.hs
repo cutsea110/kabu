@@ -133,8 +133,8 @@ printStock x = do
   T.putStr $ stockMarket x `T.snoc` ','
   T.putStrLn $ stockCategory x
 
-stocksBrand :: Stock -> Brand
-stocksBrand = Brand <$> stockCode <*> stockName <*> stockMarket <*> stockCategory
+stock'sBrand :: Stock -> Brand
+stock'sBrand = Brand <$> stockCode <*> stockName <*> stockMarket <*> stockCategory
 
 instance FromRow Brand where
   fromRow = Brand <$> field <*> field <*> field <*> field
@@ -189,9 +189,7 @@ get (Right nm) = do
   con <- mkCon
   fmap (find (const True)) $ query con "select * from stock where name = ? limit 1" (Only nm)
 
-
-ma :: Int -> [Int] -> [Int]
-ma n = map (\xs -> sum xs `div` n) . filter (\xs -> length xs == n) . mset n
-
-mset :: Int -> [a] -> [[a]]
-mset n = unfoldr (\xs -> if null xs then Nothing else Just (take n xs, drop 1 xs))
+exists :: Brand -> IO (Maybe Brand)
+exists b = do
+  con <- mkCon
+  fmap (find (const True)) $ query con "select * from brand where code = ? and name = ? and market = ? and category = ?" b
