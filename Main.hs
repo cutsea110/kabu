@@ -30,6 +30,8 @@ data Brand = Brand
              }
              deriving Show
 
+data BrandKey = BrandKey { brandKeyCode :: Text, brandKeyMarket :: Text } deriving Show
+
 data Stock = Stock
              { stockDay :: Day
              , stockCode :: Text
@@ -111,7 +113,8 @@ main = do
   let sjis = BL.pack str
   utf8 <- sjis2utf8 sjis
   let utf8text = fromLazy $ decodeUtf8 utf8
-  either putStr (mapM_ insert) $ parseOnly stocks utf8text
+  con <- mkCon
+  either putStr (mapM_ $ insert con) $ parseOnly stocks utf8text
 
 check :: IO ()
 check = check' 0 10
@@ -136,13 +139,21 @@ printStock x = do
 stock'sBrand :: Stock -> Brand
 stock'sBrand = Brand <$> stockCode <*> stockName <*> stockMarket <*> stockCategory
 
+brandKey :: Brand -> BrandKey
+brandKey = BrandKey <$> brandCode <*> brandMarket
+
+instance ToRow BrandKey where
+  toRow d = [ toField (brandKeyCode d)
+            , toField (brandKeyMarket d)
+            ]
+
 instance FromRow Brand where
   fromRow = Brand <$> field <*> field <*> field <*> field
 instance ToRow Brand where
-  toRow d = [ toField (brandCode d)
-            , toField (brandName d)
-            , toField (brandMarket d)
+  toRow d = [ toField (brandName d)
             , toField (brandCategory d)
+            , toField (brandCode d)
+            , toField (brandMarket d)
             ]
 
 instance FromRow Stock where
@@ -165,31 +176,45 @@ instance ToRow Stock where
 mkCon :: IO Connection
 mkCon = connect defaultConnectInfo { connectUser = "cutsea110", connectPassword = "cutsea110", connectDatabase = "kabu" }
 
-insert :: ToRow a => a -> IO Int64
-insert x = do
-  con <- mkCon
-  execute con "insert into stock (day,code,name,market,category,openingprice,highprice,lowprice,closingprice,volumeoftrading,tradingvalue) values (?,?,?,?,?,?,?,?,?,?,?)" x
+insert :: Connection -> Stock -> IO Int64
+insert con s = do
+  upsert con (stock'sBrand s)
+  insertStock con s
+
+insertStock :: Connection -> Stock -> IO Int64
+insertStock con =
+  execute con "insert into stock (day,code,name,market,category,openingprice,highprice,lowprice,closingprice,volumeoftrading,tradingvalue) values (?,?,?,?,?,?,?,?,?,?,?)"
+
+insertBrand :: Connection -> Brand -> IO Int64
+insertBrand con =
+  execute con "insert into brand (code,name,market,category) values (?,?,?,?)"
+
+updateBrand :: Connection -> Brand -> IO Int64
+updateBrand con =
+  execute con "update brand set name = ? , category = ? where code = ? and market = ?"
 
 type Code = Text
 type Name = Text
 
-collect :: Either Code Name -> IO [Stock]
-collect (Left cd) = do
-  con <- mkCon
+collect :: Connection -> Either Code Name -> IO [Stock]
+collect con (Left cd) =
   query con "select * from stock where code = ?" (Only cd)
-collect (Right nm) = do
-  con <- mkCon
+collect con (Right nm) =
   query con "select * from stock where name = ?" (Only nm)
 
-get :: Either Code Name -> IO (Maybe Stock)
-get (Left cd) = do
-  con <- mkCon
+get :: Connection -> Either Code Name -> IO (Maybe Stock)
+get con (Left cd) =
   fmap (find (const True)) $ query con "select * from stock where code = ? limit 1" (Only cd)
-get (Right nm) = do
-  con <- mkCon
+get con (Right nm) =
   fmap (find (const True)) $ query con "select * from stock where name = ? limit 1" (Only nm)
 
-exists :: Brand -> IO (Maybe Brand)
-exists b = do
-  con <- mkCon
-  fmap (find (const True)) $ query con "select * from brand where code = ? and name = ? and market = ? and category = ?" b
+upsert :: Connection -> Brand -> IO Int64
+upsert con b = do
+  mb <- exists con (brandKey b)
+  case mb of
+    Nothing -> insertBrand con b
+    Just _  -> updateBrand con b
+
+exists :: Connection -> BrandKey -> IO (Maybe Brand)
+exists con b =
+  fmap (find (const True)) $ query con "select * from brand where code = ? and market = ?" b
