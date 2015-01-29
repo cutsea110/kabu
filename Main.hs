@@ -22,6 +22,14 @@ import System.Environment (getArgs)
 import System.IO (hClose)
 import System.Process (runInteractiveProcess)
 
+data Brand = Brand
+             { brandCode :: Text
+             , brandName :: Text
+             , brandMarket :: Text
+             , brandCategory :: Text
+             }
+             deriving Show
+
 data Stock = Stock
              { stockDay :: Day
              , stockCode :: Text
@@ -124,6 +132,18 @@ printStock x = do
   T.putStr $ stockName x `T.snoc` ','
   T.putStr $ stockMarket x `T.snoc` ','
   T.putStrLn $ stockCategory x
+
+stocksBrand :: Stock -> Brand
+stocksBrand = Brand <$> stockCode <*> stockName <*> stockMarket <*> stockCategory
+
+instance FromRow Brand where
+  fromRow = Brand <$> field <*> field <*> field <*> field
+instance ToRow Brand where
+  toRow d = [ toField (brandCode d)
+            , toField (brandName d)
+            , toField (brandMarket d)
+            , toField (brandCategory d)
+            ]
 
 instance FromRow Stock where
   fromRow = Stock <$> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field
