@@ -3,9 +3,11 @@ create table brand (
   name varchar(128) not null,
   market varchar(32) not null,
   category varchar(16) not null,
+  lastupdated date not null,
   PRIMARY KEY (code,market)
 );
 create index idx_brand_code on brand (code);
+create index idx_brand_market on brand (market);
 
 create table stock (
   day date not null,
@@ -28,8 +30,8 @@ create index idx_stock_name on stocks (name);
 create index idx_stock_market on stocks (market);
 create index idx_stock_category on stocks (category);
 
-insert into brand(code,name,market,category)
-select s.code,s.name,s.market,s.category
+insert into brand(code,name,market,category,lastupdated)
+select s.code,s.name,s.market,s.category,s.day
 from stock s,
      (select code, market, max(day) as day
       from stock
