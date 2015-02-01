@@ -211,11 +211,7 @@ get con (Right nm) =
   fmap (find (const True)) $ query con "select * from stock where name = ? limit 1" (Only nm)
 
 upsert :: Connection -> Brand -> IO Int64
-upsert con b = do
-  mb <- exists con (brandKey b)
-  case mb of
-    Nothing -> insertBrand con b
-    Just _  -> updateBrand con b
+upsert con b = maybe (insertBrand con b) (const $ updateBrand con b) =<< exists con (brandKey b)
 
 exists :: Connection -> BrandKey -> IO (Maybe Brand)
 exists con b =
