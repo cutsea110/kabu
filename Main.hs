@@ -17,10 +17,20 @@ import Database.PostgreSQL.Simple (connect, Connection, defaultConnectInfo, Conn
 import Database.PostgreSQL.Simple.FromRow (FromRow(..), field)
 import Database.PostgreSQL.Simple.ToField (ToField(..))
 import Database.PostgreSQL.Simple.ToRow (ToRow(..))
+import Database.PostgreSQL.Simple.Types (Query)
 import Network.HTTP (simpleHTTP, getRequest, getResponseBody)
 import System.Environment (getArgs)
 import System.IO (hClose)
 import System.Process (runInteractiveProcess)
+
+flip3 :: (t1 -> t2 -> t3 -> t) -> t2 -> t3 -> t1 -> t
+flip3 f y z x = f x y z
+
+execute' :: ToRow q => Query -> q -> DB Int64
+execute' = flip3 execute
+
+query' :: (FromRow r, ToRow q) => Query -> q -> DB [r]
+query' = flip3 query
 
 data Brand = Brand
              { brandCode :: Text
@@ -115,7 +125,7 @@ main = do
   utf8 <- sjis2utf8 sjis
   let utf8text = fromLazy $ decodeUtf8 utf8
   con <- mkCon
-  either putStr (mapM_ $ insert con) $ parseOnly stocks utf8text
+  either putStr (mapM_ $ flip insert con) $ parseOnly stocks utf8text
 
 check :: IO ()
 check = check' 0 10
@@ -178,41 +188,33 @@ instance ToRow Stock where
 mkCon :: IO Connection
 mkCon = connect defaultConnectInfo { connectUser = "cutsea110", connectPassword = "cutsea110", connectDatabase = "kabu" }
 
-insert :: Connection -> Stock -> IO Int64
-insert con s = do
-  upsert con (stock'sBrand s)
-  insertStock con s
+type DB a = Connection -> IO a
 
-insertStock :: Connection -> Stock -> IO Int64
-insertStock con =
-  execute con "insert into stock (day,code,name,market,category,openingprice,highprice,lowprice,closingprice,volumeoftrading,tradingvalue) values (?,?,?,?,?,?,?,?,?,?,?)"
+insert :: Stock -> DB Int64
+insert s con = upsert (stock'sBrand s) con >> insertStock s con
 
-insertBrand :: Connection -> Brand -> IO Int64
-insertBrand con =
-  execute con "insert into brand (code,name,market,category,lastupdated) values (?,?,?,?,?)"
+insertStock :: Stock -> DB Int64
+insertStock = execute' "insert into stock (day,code,name,market,category,openingprice,highprice,lowprice,closingprice,volumeoftrading,tradingvalue) values (?,?,?,?,?,?,?,?,?,?,?)"
 
-updateBrand :: Connection -> Brand -> IO Int64
-updateBrand con =
-  execute con "update brand set name = ? , category = ? , lastupdated = ? where code = ? and market = ?"
+insertBrand :: Brand -> DB Int64
+insertBrand = execute' "insert into brand (code,name,market,category,lastupdated) values (?,?,?,?,?)"
+
+updateBrand :: Brand -> DB Int64
+updateBrand = execute' "update brand set name = ? , category = ? , lastupdated = ? where code = ? and market = ?"
 
 type Code = Text
 type Name = Text
 
-collect :: Connection -> Either Code Name -> IO [Stock]
-collect con (Left cd) =
-  query con "select * from stock where code = ?" (Only cd)
-collect con (Right nm) =
-  query con "select * from stock where name = ?" (Only nm)
+collect :: Either Code Name -> DB [Stock]
+collect (Left  cd) = query' "select * from stock where code = ?" (Only cd)
+collect (Right nm) = query' "select * from stock where name = ?" (Only nm)
 
-get :: Connection -> Either Code Name -> IO (Maybe Stock)
-get con (Left cd) =
-  fmap (find (const True)) $ query con "select * from stock where code = ? limit 1" (Only cd)
-get con (Right nm) =
-  fmap (find (const True)) $ query con "select * from stock where name = ? limit 1" (Only nm)
+get :: Either Code Name -> DB (Maybe Stock)
+get (Left  cd) = fmap (find (const True)) . query' "select * from stock where code = ? limit 1" (Only cd)
+get (Right nm) = fmap (find (const True)) . query' "select * from stock where name = ? limit 1" (Only nm)
 
-upsert :: Connection -> Brand -> IO Int64
-upsert con b = maybe (insertBrand con b) (const $ updateBrand con b) =<< exists con (brandKey b)
+upsert :: Brand -> DB Int64
+upsert b con = maybe (insertBrand b con) (const $ updateBrand b con) =<< exists (brandKey b) con
 
-exists :: Connection -> BrandKey -> IO (Maybe Brand)
-exists con b =
-  fmap (find (const True)) $ query con "select * from brand where code = ? and market = ?" b
+exists :: BrandKey -> DB (Maybe Brand)
+exists = (fmap (find (const True)) .) . query' "select * from brand where code = ? and market = ?"
