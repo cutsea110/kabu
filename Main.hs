@@ -1,11 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Data.Foldable (find)
-import Data.List (unfoldr)
 import Control.Applicative ((<$>), (<*>), (<*), (*>), (<|>), many)
+import Control.Arrow ((***))
+import Data.Foldable (Foldable, find)
+import Data.List (unfoldr)
 import Data.Attoparsec.Text (parseOnly, many', string, try, (<?>), decimal, char, Parser, notChar, double)
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.ByteString.Char8 as B
 import Data.Int (Int64)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -17,7 +19,7 @@ import Database.PostgreSQL.Simple (connect, Connection, defaultConnectInfo, Conn
 import Database.PostgreSQL.Simple.FromRow (FromRow(..), field)
 import Database.PostgreSQL.Simple.ToField (ToField(..))
 import Database.PostgreSQL.Simple.ToRow (ToRow(..))
-import Database.PostgreSQL.Simple.Types (Query)
+import Database.PostgreSQL.Simple.Types (Query(..))
 import Network.HTTP (simpleHTTP, getRequest, getResponseBody)
 import System.Environment (getArgs)
 import System.IO (hClose)
@@ -206,15 +208,26 @@ type Code = Text
 type Name = Text
 
 collect :: Either Code Name -> DB [Stock]
-collect (Left  cd) = query' "select * from stock where code = ?" (Only cd)
-collect (Right nm) = query' "select * from stock where name = ?" (Only nm)
+collect = either code name
+    where
+      (code, name) = (q *** q) ("code", "name")
+      q f = q' f . Only
+      q' :: (FromRow r, ToRow q) => [Char] -> q -> DB [r]
+      q' f = query' . Query . B.pack $ "select * from stock where " ++ f ++ " = ?"
 
 get :: Either Code Name -> DB (Maybe Stock)
-get (Left  cd) = fmap (find (const True)) . query' "select * from stock where code = ? limit 1" (Only cd)
-get (Right nm) = fmap (find (const True)) . query' "select * from stock where name = ? limit 1" (Only nm)
+get = either code name
+    where
+      (code, name) = (q *** q) ("code", "name")
+      q f = (fmap toMaybe .) . q' f . Only
+      q' :: (FromRow r, ToRow q) => String -> q -> DB [r]
+      q' f = query' . Query . B.pack $ "select * from stock where " ++ f ++ " = ? limit 1"
 
 upsert :: Brand -> DB Int64
 upsert b con = maybe (insertBrand b con) (const $ updateBrand b con) =<< exists (brandKey b) con
 
 exists :: BrandKey -> DB (Maybe Brand)
-exists = (fmap (find (const True)) .) . query' "select * from brand where code = ? and market = ?"
+exists = (fmap toMaybe .) . query' "select * from brand where code = ? and market = ?"
+
+toMaybe  :: [a] -> Maybe a
+toMaybe = find (const True)
