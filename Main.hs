@@ -27,6 +27,7 @@ data Brand = Brand
              , brandName :: Text
              , brandMarket :: Text
              , brandCategory :: Text
+             , brandLastUpdated :: Day
              }
              deriving Show
 
@@ -137,7 +138,7 @@ printStock x = do
   T.putStrLn $ stockCategory x
 
 stock'sBrand :: Stock -> Brand
-stock'sBrand = Brand <$> stockCode <*> stockName <*> stockMarket <*> stockCategory
+stock'sBrand = Brand <$> stockCode <*> stockName <*> stockMarket <*> stockCategory <*> stockDay
 
 brandKey :: Brand -> BrandKey
 brandKey = BrandKey <$> brandCode <*> brandMarket
@@ -148,10 +149,11 @@ instance ToRow BrandKey where
             ]
 
 instance FromRow Brand where
-  fromRow = Brand <$> field <*> field <*> field <*> field
+  fromRow = Brand <$> field <*> field <*> field <*> field <*> field
 instance ToRow Brand where
   toRow d = [ toField (brandName d)
             , toField (brandCategory d)
+            , toField (brandLastUpdated d)
             , toField (brandCode d)
             , toField (brandMarket d)
             ]
@@ -187,11 +189,11 @@ insertStock con =
 
 insertBrand :: Connection -> Brand -> IO Int64
 insertBrand con =
-  execute con "insert into brand (code,name,market,category) values (?,?,?,?)"
+  execute con "insert into brand (code,name,market,category,lastupdated) values (?,?,?,?,?)"
 
 updateBrand :: Connection -> Brand -> IO Int64
 updateBrand con =
-  execute con "update brand set name = ? , category = ? where code = ? and market = ?"
+  execute con "update brand set name = ? , category = ? , lastupdated = ? where code = ? and market = ?"
 
 type Code = Text
 type Name = Text
