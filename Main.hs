@@ -199,7 +199,7 @@ insertStock :: Stock -> DB Int64
 insertStock = execute' "insert into stock (day,code,name,market,category,openingprice,highprice,lowprice,closingprice,volumeoftrading,tradingvalue) values (?,?,?,?,?,?,?,?,?,?,?)"
 
 insertBrand :: Brand -> DB Int64
-insertBrand = execute' "insert into brand (code,name,market,category,lastupdated) values (?,?,?,?,?)"
+insertBrand = execute' "insert into brand (name,category,lastupdated,code,market) values (?,?,?,?,?)"
 
 updateBrand :: Brand -> DB Int64
 updateBrand = execute' "update brand set name = ? , category = ? , lastupdated = ? where code = ? and market = ?"
